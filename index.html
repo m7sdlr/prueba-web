@@ -87,12 +87,22 @@
     #stats-bar {
       background: #111;
       display: flex; justify-content: space-around; align-items: center;
-      padding: 10px 0 14px; flex-shrink: 0;
+      padding: 10px 0;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      flex-shrink: 0;
+      min-height: 64px;
+      border-top: 1px solid rgba(255,255,255,0.08);
     }
-    .stat-item { text-align: center; }
-    .stat-item .sv { font-size: 18px; font-weight: 600; color: #fff; }
-    .stat-item .sl { font-size: 10px; color: #555; margin-top: 1px; }
-    .stat-item.verde .sv { color: #3a9; }
+    .stat-item {
+      text-align: center;
+      flex: 1;
+      padding: 4px 0;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-item .sv { font-size: 20px; font-weight: 700; color: #fff; line-height: 1.1; }
+    .stat-item .sl { font-size: 9px; color: #666; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-item.verde .sv { color: #3db87a; }
 
     /* Alerta overlay */
     #alerta-overlay {
@@ -112,22 +122,28 @@
 
     /* GPS status */
     #gps-status {
-      position: fixed; bottom: 80px; right: 12px;
-      background: rgba(0,0,0,0.7); border-radius: 20px;
+      position: fixed; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); right: 12px;
+      background: rgba(0,0,0,0.75); border-radius: 20px;
       padding: 6px 10px; font-size: 11px; color: #aaa;
-      z-index: 1500;
+      z-index: 1500; display: none;
     }
-    #gps-status.activo { color: #3a9; }
+    #gps-status.activo { color: #3db87a; }
     #gps-status.error { color: #e44; }
 
     /* Botón centrar */
     #btn-centrar {
-      position: fixed; bottom: 80px; left: 12px;
-      background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 50%; width: 40px; height: 40px;
-      color: #7ec8e3; font-size: 18px;
-      display: flex; align-items: center; justify-content: center;
+      position: fixed; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); left: 12px;
+      background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 10px; width: 44px; height: 44px;
+      color: #7ec8e3; font-size: 20px;
+      display: none; align-items: center; justify-content: center;
       cursor: pointer; z-index: 1500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #btn-centrar.bloqueado {
+      background: rgba(30,77,140,0.85);
+      border-color: #7ec8e3;
+      color: #fff;
     }
 
     /* Loading */
@@ -324,11 +340,11 @@ async function iniciarRuta(idx) {
   alertasYaMostradas.clear();
   distanciaRecorrida = 0;
   posAnterior = null;
+  gpsActivo = false;
+  autoCentrar = true;
 
   document.getElementById('screen-inicio').style.display = 'none';
   document.getElementById('screen-nav').style.display = 'flex';
-  document.getElementById('btn-centrar').style.display = 'flex';
-  document.getElementById('gps-status').style.display = 'block';
 
   await initMapa();
   iniciarGPS();
@@ -427,7 +443,18 @@ async function initMapa() {
     });
   });
 
-  // Marcador de posición (se actualiza con GPS)
+  // Cuando el usuario mueve el mapa manualmente → desactivar seguimiento automático
+  map.on('dragstart', () => {
+    if (autoCentrar) {
+      autoCentrar = false;
+      actualizarBtnCentrar();
+    }
+  });
+
+  // Mostrar botón centrar
+  const btnCentrar = document.getElementById('btn-centrar');
+  btnCentrar.style.display = 'flex';
+  actualizarBtnCentrar();
   const posIcon = L.divIcon({
     html: `<div style="
       background:#4af; border:3px solid #fff; border-radius:50%;
@@ -441,21 +468,26 @@ async function initMapa() {
 }
 
 // ── GPS ────────────────────────────────────────────────────────────────
+let gpsActivo = false; // flag para no disparar alertas sin GPS real
+
 function iniciarGPS() {
   const statusEl = document.getElementById('gps-status');
 
   if (!navigator.geolocation) {
     statusEl.textContent = '✗ GPS no disponible';
     statusEl.className = 'error';
+    statusEl.style.display = 'block';
     return;
   }
 
   statusEl.textContent = '○ Buscando GPS…';
+  statusEl.style.display = 'block';
 
   watchId = navigator.geolocation.watchPosition(
     pos => {
       statusEl.textContent = '● GPS activo';
       statusEl.className = 'activo';
+      gpsActivo = true;
 
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
@@ -465,17 +497,18 @@ function iniciarGPS() {
       // Actualizar marcador
       if (posMarker) posMarker.setLatLng([lat, lng]);
 
-      // Centrar mapa si autoCentrar
+      // Centrar mapa solo si autoCentrar está activo
       if (autoCentrar && map) map.setView([lat, lng], 15, { animate: true, duration: 0.5 });
 
       // Estadísticas
       if (posAnterior) {
         const d = distancia(posAnterior, [lat, lng]);
-        if (d < 500) distanciaRecorrida += d; // filtrar saltos grandes
+        if (d < 500) distanciaRecorrida += d;
       }
       posAnterior = [lat, lng];
 
       actualizarStats(vel);
+      // Solo comprobar alertas si el GPS ya estaba activo (evita falsa alarma inicial)
       comprobarProximidad([lat, lng]);
       actualizarInstruccion([lat, lng]);
     },
@@ -576,22 +609,38 @@ function distancia([lat1, lon1], [lat2, lon2]) {
 
 function centrarMapa() {
   if (posActual && map) {
-    autoCentrar = true;
+    // Centrar una vez en la posición actual sin reactivar el seguimiento automático
     map.setView(posActual, 15, { animate: true });
+    // Si estaba en modo libre, reactivamos el seguimiento
+    if (!autoCentrar) {
+      autoCentrar = true;
+      document.getElementById('btn-centrar').classList.add('bloqueado');
+      document.getElementById('btn-centrar').textContent = '⊙';
+    }
   } else if (map && rutaLayer) {
     map.fitBounds(rutaLayer.getBounds(), { padding: [20, 20] });
   }
 }
 
-// Desactivar auto-centrar cuando el usuario mueve el mapa
-document.addEventListener('DOMContentLoaded', () => {
-  // Se añade el listener después de que map esté disponible (en initMapa)
-});
+// Actualizar icono del botón según estado
+function actualizarBtnCentrar() {
+  const btn = document.getElementById('btn-centrar');
+  if (autoCentrar) {
+    btn.classList.add('bloqueado');
+    btn.textContent = '⊙';
+    btn.title = 'Siguiendo posición — toca para ver la ruta completa';
+  } else {
+    btn.classList.remove('bloqueado');
+    btn.textContent = '⊕';
+    btn.title = 'Centrar en mi posición y reanudar seguimiento';
+  }
+}
 
 function volverInicio() {
   if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   if (wakeLock) { wakeLock.release(); wakeLock = null; }
   if (map) { map.remove(); map = null; }
+  gpsActivo = false;
   document.getElementById('screen-nav').style.display = 'none';
   document.getElementById('screen-inicio').style.display = 'flex';
   document.getElementById('btn-centrar').style.display = 'none';
