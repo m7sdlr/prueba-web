@@ -109,12 +109,13 @@
       position: fixed; top: 68px; left: 0; right: 0;
       background: #7a3c00;
       padding: 10px 14px;
-      display: flex; align-items: center; gap: 10px;
+      display: none; align-items: center; gap: 10px;
       z-index: 2000;
-      transform: translateY(-100%); transition: transform 0.3s;
       border-bottom: 1px solid rgba(255,165,0,0.3);
+      animation: slideDown 0.3s ease;
     }
-    #alerta-overlay.visible { transform: translateY(0); }
+    #alerta-overlay.visible { display: flex; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
     #alerta-icono { font-size: 22px; }
     #alerta-texto { flex: 1; }
     #alerta-titulo { font-size: 13px; font-weight: 600; color: #ffc; }
@@ -320,7 +321,7 @@ function renderInicio() {
         <h2>${p.nom_e || 'Ruta ciclista'}</h2>
         <span class="ruta-badge">${p.long_e || '?'} km</span>
       </div>
-      <p class="ruta-desc">${(p.desc_e || '').substring(0, 120)}…</p>
+      <p class="ruta-desc">${p.desc_e ? p.desc_e.substring(0, 120) + '…' : `Ruta de ${p.long_e || '?'} km desde ${p.inicio || '—'} hasta ${p.final || '—'}.`}</p>
       <div class="ruta-stats">
         <div class="ruta-stat"><div class="val">${p.desn_sub_e || '—'}</div><div class="lbl">m desnivel</div></div>
         <div class="ruta-stat"><div class="val">${p.alt_max_e || '—'}</div><div class="lbl">m altitud máx</div></div>
