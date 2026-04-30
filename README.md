@@ -1,5 +1,4 @@
-# PWA Navegación Ciclista · Ruta del Vino Montilla-Moriles
-## Real Federación Española de Ciclismo
+
 
 ---
 
@@ -17,20 +16,6 @@ pwa-ruta/
 
 ---
 
-## Despliegue en GitHub Pages (recomendado para prototipo)
-
-1. Crea un repositorio en GitHub (público)
-2. Sube todos los archivos de esta carpeta
-3. Ve a **Settings → Pages → Source: main / root**
-4. En 2 minutos tendrás una URL tipo: `https://tuusuario.github.io/ruta-vino/`
-
-## Despliegue en Hostinger
-
-1. Conéctate al panel de Hostinger
-2. Ve a **Administrador de archivos → public_html**
-3. Sube todos los archivos
-4. La app estará en tu dominio: `https://tudominio.com/`
-
 ---
 
 ## Instalación en el móvil
@@ -44,14 +29,7 @@ pwa-ruta/
 
 ## Funcionalidades
 
-- **2 rutas:** Puente Genil → Moriles e inversa (Moriles → Puente Genil)
-- **GPS en tiempo real** con marcador de posición
-- **Banner de instrucción** con la próxima señal de giro
-- **Alertas automáticas** al acercarte a 40m de cualquier señal o punto de atención
-- **Vibración** al dispararse una alerta (si el dispositivo lo soporta)
-- **Estadísticas** en vivo: km recorridos, km restantes, velocidad, próxima señal
-- **WakeLock** — la pantalla no se apaga mientras navegas
-- **Offline** — una vez cargada, funciona sin conexión (tiles de mapa se cachean)
+- **2 rutas:**
 
 ---
 
@@ -70,15 +48,4 @@ pwa-ruta/
 
 ---
 
-## Próximas mejoras sugeridas
 
-- [ ] Añadir capa de POIs (bodegas, restaurantes, alojamientos)
-- [ ] Perfil de elevación interactivo
-- [ ] Descarga de tiles offline por zonas
-- [ ] Modo vista aérea (satélite)
-- [ ] Backend para rutas dinámicas (múltiples rutas RFEC)
-- [ ] Integración con Strava/Komoot
-
----
-
-*Desarrollado como prototipo para el proyecto Bike Territory / RFEC*
