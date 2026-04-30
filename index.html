@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1b2a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ruta Vino">
+  <link rel="manifest" href="manifest.json">
+  <title>Ruta del Vino · Montilla-Moriles</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1b2a; color: #fff; overflow: hidden; }
+
+    /* ── PANTALLA INICIO ── */
+    #screen-inicio {
+      height: 100vh; display: flex; flex-direction: column;
+      background: linear-gradient(180deg, #0d1b2a 0%, #0a2240 100%);
+    }
+    .inicio-header {
+      padding: 48px 24px 24px;
+      text-align: center;
+    }
+    .inicio-header .logo { font-size: 40px; margin-bottom: 8px; }
+    .inicio-header h1 { font-size: 20px; font-weight: 600; color: #7ec8e3; }
+    .inicio-header p { font-size: 13px; color: #667; margin-top: 4px; }
+
+    .rutas-lista {
+      flex: 1; overflow-y: auto; padding: 0 16px 24px;
+    }
+    .ruta-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .ruta-card:active { background: rgba(255,255,255,0.1); }
+    .ruta-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .ruta-card h2 { font-size: 15px; font-weight: 600; color: #fff; }
+    .ruta-badge { background: rgba(58,180,100,0.2); color: #6eeb9a; font-size: 11px; padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(58,180,100,0.3); white-space: nowrap; }
+    .ruta-desc { font-size: 12px; color: #889; line-height: 1.5; margin-bottom: 12px; }
+    .ruta-stats { display: flex; gap: 16px; }
+    .ruta-stat { text-align: center; }
+    .ruta-stat .val { font-size: 16px; font-weight: 600; color: #7ec8e3; }
+    .ruta-stat .lbl { font-size: 10px; color: #667; }
+    .btn-iniciar {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 14px;
+      background: #1e6b3c; border: none; border-radius: 12px;
+      color: #9fe; font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 12px;
+    }
+    .btn-iniciar:active { background: #175730; }
+
+    /* ── PANTALLA NAVEGACIÓN ── */
+    #screen-nav { height: 100vh; display: flex; flex-direction: column; display: none; }
+
+    /* Instrucción banner */
+    #instruccion-banner {
+      background: #1e4d8c;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 12px;
+      min-height: 68px; flex-shrink: 0;
+      position: relative; z-index: 1000;
+    }
+    #inst-icono { font-size: 32px; line-height: 1; min-width: 40px; text-align: center; }
+    #inst-texto { flex: 1; }
+    #inst-distancia { font-size: 11px; color: #7ec8e3; }
+    #inst-nombre { font-size: 14px; font-weight: 600; color: #fff; margin-top: 1px; }
+    #inst-sub { font-size: 11px; color: #aaa; margin-top: 1px; }
+    #btn-cerrar-nav {
+      background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
+      width: 32px; height: 32px; color: #fff; font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Mapa */
+    #mapa { flex: 1; }
+
+    /* Stats barra inferior */
+    #stats-bar {
+      background: #111;
+      display: flex; justify-content: space-around; align-items: center;
+      padding: 10px 0 14px; flex-shrink: 0;
+    }
+    .stat-item { text-align: center; }
+    .stat-item .sv { font-size: 18px; font-weight: 600; color: #fff; }
+    .stat-item .sl { font-size: 10px; color: #555; margin-top: 1px; }
+    .stat-item.verde .sv { color: #3a9; }
+
+    /* Alerta overlay */
+    #alerta-overlay {
+      position: fixed; top: 68px; left: 0; right: 0;
+      background: #7a3c00;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+      z-index: 2000;
+      transform: translateY(-100%); transition: transform 0.3s;
+      border-bottom: 1px solid rgba(255,165,0,0.3);
+    }
+    #alerta-overlay.visible { transform: translateY(0); }
+    #alerta-icono { font-size: 22px; }
+    #alerta-texto { flex: 1; }
+    #alerta-titulo { font-size: 13px; font-weight: 600; color: #ffc; }
+    #alerta-desc { font-size: 11px; color: #fa0; margin-top: 2px; }
+
+    /* GPS status */
+    #gps-status {
+      position: fixed; bottom: 80px; right: 12px;
+      background: rgba(0,0,0,0.7); border-radius: 20px;
+      padding: 6px 10px; font-size: 11px; color: #aaa;
+      z-index: 1500;
+    }
+    #gps-status.activo { color: #3a9; }
+    #gps-status.error { color: #e44; }
+
+    /* Botón centrar */
+    #btn-centrar {
+      position: fixed; bottom: 80px; left: 12px;
+      background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%; width: 40px; height: 40px;
+      color: #7ec8e3; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 1500;
+    }
+
+    /* Loading */
+    #loading {
+      position: fixed; inset: 0; background: #0d1b2a;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      z-index: 9999;
+    }
+    #loading.oculto { display: none; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(126,200,227,0.2);
+      border-top-color: #7ec8e3;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { font-size: 14px; color: #7ec8e3; }
+
+    /* Leaflet customizaciones */
+    .leaflet-container { background: #1e2d1e; }
+    .icon-señal { display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Cargando ruta…</p>
+</div>
+
+<!-- PANTALLA INICIO -->
+<div id="screen-inicio">
+  <div class="inicio-header">
+    <div class="logo">🚴</div>
+    <h1>Ruta del Vino · Montilla-Moriles</h1>
+    <p>Real Federación Española de Ciclismo</p>
+  </div>
+  <div class="rutas-lista" id="lista-rutas">
+    <!-- rutas insertadas por JS -->
+  </div>
+</div>
+
+<!-- PANTALLA NAVEGACIÓN -->
+<div id="screen-nav">
+  <!-- Banner instrucción -->
+  <div id="instruccion-banner">
+    <div id="inst-icono">🚴</div>
+    <div id="inst-texto">
+      <div id="inst-distancia">Preparado</div>
+      <div id="inst-nombre">Sigue el trazado en azul</div>
+      <div id="inst-sub">GPS activo</div>
+    </div>
+    <button id="btn-cerrar-nav" onclick="volverInicio()">✕</button>
+  </div>
+
+  <!-- Mapa -->
+  <div id="mapa"></div>
+
+  <!-- Stats -->
+  <div id="stats-bar">
+    <div class="stat-item">
+      <div class="sv" id="stat-dist">—</div>
+      <div class="sl">km recorridos</div>
+    </div>
+    <div class="stat-item">
+      <div class="sv" id="stat-rest">—</div>
+      <div class="sl">km restantes</div>
+    </div>
+    <div class="stat-item verde">
+      <div class="sv" id="stat-vel">—</div>
+      <div class="sl">km/h</div>
+    </div>
+    <div class="stat-item">
+      <div class="sv" id="stat-next">—</div>
+      <div class="sl">próx. señal</div>
+    </div>
+  </div>
+</div>
+
+<!-- Alerta overlay -->
+<div id="alerta-overlay">
+  <div id="alerta-icono">⚠️</div>
+  <div id="alerta-texto">
+    <div id="alerta-titulo">Punto de atención</div>
+    <div id="alerta-desc"></div>
+  </div>
+</div>
+
+<!-- GPS status -->
+<div id="gps-status">⊙ GPS</div>
+
+<!-- Botón centrar -->
+<button id="btn-centrar" onclick="centrarMapa()">⊕</button>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+
+// ── DATOS ──────────────────────────────────────────────────────────────
+let rutaData = null, senalizacionData = null, atencionData = null;
+let map = null, rutaLayer = null, posMarker = null;
+let watchId = null, posActual = null;
+let rutaActiva = null; // feature de ruta seleccionada
+let puntosPorProximidad = []; // señales + atención combinadas
+let alertasYaMostradas = new Set();
+let wakeLock = null;
+let distanciaRecorrida = 0, posAnterior = null;
+let autoCentrar = true;
+
+// Iconos por tipo de señal
+const ICONOS = {
+  salida:            { emoji: '🚦', color: '#4af', label: 'Salida' },
+  llegada:           { emoji: '🏁', color: '#4af', label: 'Llegada' },
+  recto:             { emoji: '↑',  color: '#3a9', label: 'Recto' },
+  izquierda:         { emoji: '↰',  color: '#7ec8e3', label: 'Izquierda' },
+  derecha:           { emoji: '↱',  color: '#7ec8e3', label: 'Derecha' },
+  rotonda:           { emoji: '↺',  color: '#fa0', label: 'Rotonda' },
+  peligro:           { emoji: '⚠️', color: '#fa0', label: 'Peligro' },
+  'vado inundable':  { emoji: '🌊', color: '#4af', label: 'Vado inundable' },
+  'izquierda peligro': { emoji: '⚠️↰', color: '#fa0', label: 'Izq. con peligro' },
+  'derecha peligro': { emoji: '⚠️↱', color: '#fa0', label: 'Der. con peligro' },
+  atencion:          { emoji: '🔴', color: '#e44', label: 'Atención' },
+  default:           { emoji: '📍', color: '#888', label: 'Señal' }
+};
+
+function getIconoInfo(tipo) {
+  if (!tipo) return ICONOS.default;
+  const t = tipo.toLowerCase().trim();
+  // match exacto
+  if (ICONOS[t]) return ICONOS[t];
+  // match parcial
+  if (t.includes('izquierda') && t.includes('peligro')) return ICONOS['izquierda peligro'];
+  if (t.includes('derecha') && t.includes('peligro')) return ICONOS['derecha peligro'];
+  if (t.includes('izquierda')) return ICONOS.izquierda;
+  if (t.includes('derecha')) return ICONOS.derecha;
+  if (t.includes('peligro')) return ICONOS.peligro;
+  if (t.includes('vado')) return ICONOS['vado inundable'];
+  if (t.includes('rotonda')) return ICONOS.rotonda;
+  if (t.includes('recto')) return ICONOS.recto;
+  return ICONOS.default;
+}
+
+// ── CARGA GEOJSON ──────────────────────────────────────────────────────
+async function cargarDatos() {
+  try {
+    const [r, s, a] = await Promise.all([
+      fetch('ruta.geojson').then(x => x.json()),
+      fetch('senalizacion.geojson').then(x => x.json()),
+      fetch('atencion.geojson').then(x => x.json())
+    ]);
+    rutaData = r;
+    senalizacionData = s;
+    atencionData = a;
+    document.getElementById('loading').classList.add('oculto');
+    renderInicio();
+  } catch(e) {
+    document.getElementById('loading').querySelector('p').textContent = 'Error cargando datos. Comprueba la conexión.';
+  }
+}
+
+// ── PANTALLA INICIO ────────────────────────────────────────────────────
+function renderInicio() {
+  const lista = document.getElementById('lista-rutas');
+  lista.innerHTML = '';
+
+  rutaData.features.forEach((feat, i) => {
+    const p = feat.properties;
+    const card = document.createElement('div');
+    card.className = 'ruta-card';
+    card.innerHTML = `
+      <div class="ruta-card-header">
+        <h2>${p.nom_e || 'Ruta ciclista'}</h2>
+        <span class="ruta-badge">${p.long_e || '?'} km</span>
+      </div>
+      <p class="ruta-desc">${(p.desc_e || '').substring(0, 120)}…</p>
+      <div class="ruta-stats">
+        <div class="ruta-stat"><div class="val">${p.desn_sub_e || '—'}</div><div class="lbl">m desnivel</div></div>
+        <div class="ruta-stat"><div class="val">${p.alt_max_e || '—'}</div><div class="lbl">m altitud máx</div></div>
+        <div class="ruta-stat"><div class="val">${p.pdte_sub_e ? p.pdte_sub_e+'%' : '—'}</div><div class="lbl">pendiente media</div></div>
+      </div>
+      <button class="btn-iniciar" onclick="iniciarRuta(${i})">
+        <span>▶</span> Iniciar navegación
+      </button>
+    `;
+    lista.appendChild(card);
+  });
+}
+
+// ── INICIAR NAVEGACIÓN ──────────────────────────────────────────────────
+async function iniciarRuta(idx) {
+  rutaActiva = rutaData.features[idx];
+  alertasYaMostradas.clear();
+  distanciaRecorrida = 0;
+  posAnterior = null;
+
+  document.getElementById('screen-inicio').style.display = 'none';
+  document.getElementById('screen-nav').style.display = 'flex';
+  document.getElementById('btn-centrar').style.display = 'flex';
+  document.getElementById('gps-status').style.display = 'block';
+
+  await initMapa();
+  iniciarGPS();
+  solicitarWakeLock();
+}
+
+// ── MAPA ───────────────────────────────────────────────────────────────
+async function initMapa() {
+  if (map) { map.remove(); map = null; }
+
+  map = L.map('mapa', {
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // Trazado de la ruta
+  const coords = rutaActiva.geometry.coordinates.map(c => [c[1], c[0]]);
+  rutaLayer = L.polyline(coords, { color: '#3ab87a', weight: 5, opacity: 0.85 }).addTo(map);
+  map.fitBounds(rutaLayer.getBounds(), { padding: [20, 20] });
+
+  // Construir array de puntos con señales + atención para alertas
+  puntosPorProximidad = [];
+
+  // Señalización (solo las que tienen geometría)
+  senalizacionData.features.forEach(f => {
+    if (!f.geometry || !f.geometry.coordinates) return;
+    const tipo = f.properties.Ida || '';
+    const info = getIconoInfo(tipo);
+    const dist = f.properties.dist;
+    const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+
+    // Icono en el mapa
+    const divIcon = L.divIcon({
+      html: `<div style="
+        background:${info.color};
+        border:2px solid #fff;
+        border-radius:50%;
+        width:24px; height:24px;
+        display:flex; align-items:center; justify-content:center;
+        font-size:12px; box-shadow:0 2px 4px rgba(0,0,0,0.5);
+      ">${info.emoji}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      className: ''
+    });
+
+    const marker = L.marker(latlng, { icon: divIcon }).addTo(map);
+    marker.bindPopup(`<b>${tipo}</b>${dist !== null ? '<br>' + dist + ' km' : ''}`);
+
+    puntosPorProximidad.push({
+      id: 'señal_' + f.properties.fid,
+      latlng,
+      tipo: 'señal',
+      titulo: info.label,
+      desc: tipo + (dist !== null ? ` · km ${dist}` : ''),
+      icono: info.emoji,
+      color: info.color
+    });
+  });
+
+  // Puntos de atención
+  atencionData.features.forEach(f => {
+    if (!f.geometry) return;
+    const latlng = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+    const desc = f.properties.desc_PEA || 'Punto de atención';
+
+    const divIcon = L.divIcon({
+      html: `<div style="
+        background:#e44;
+        border:2px solid #fff;
+        border-radius:4px;
+        width:24px; height:24px;
+        display:flex; align-items:center; justify-content:center;
+        font-size:12px; box-shadow:0 2px 4px rgba(0,0,0,0.5);
+      ">🔴</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      className: ''
+    });
+
+    L.marker(latlng, { icon: divIcon }).addTo(map)
+      .bindPopup(`<b>⚠️ Atención</b><br>${desc}`);
+
+    puntosPorProximidad.push({
+      id: 'aten_' + f.properties.fid,
+      latlng,
+      tipo: 'atencion',
+      titulo: 'Punto de atención',
+      desc,
+      icono: '🔴',
+      color: '#e44'
+    });
+  });
+
+  // Marcador de posición (se actualiza con GPS)
+  const posIcon = L.divIcon({
+    html: `<div style="
+      background:#4af; border:3px solid #fff; border-radius:50%;
+      width:16px; height:16px; box-shadow:0 0 0 6px rgba(64,170,255,0.25);
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    className: ''
+  });
+  posMarker = L.marker([coords[0][0], coords[0][1]], { icon: posIcon, zIndexOffset: 1000 }).addTo(map);
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────
+function iniciarGPS() {
+  const statusEl = document.getElementById('gps-status');
+
+  if (!navigator.geolocation) {
+    statusEl.textContent = '✗ GPS no disponible';
+    statusEl.className = 'error';
+    return;
+  }
+
+  statusEl.textContent = '○ Buscando GPS…';
+
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      statusEl.textContent = '● GPS activo';
+      statusEl.className = 'activo';
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const vel = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : null;
+      posActual = [lat, lng];
+
+      // Actualizar marcador
+      if (posMarker) posMarker.setLatLng([lat, lng]);
+
+      // Centrar mapa si autoCentrar
+      if (autoCentrar && map) map.setView([lat, lng], 15, { animate: true, duration: 0.5 });
+
+      // Estadísticas
+      if (posAnterior) {
+        const d = distancia(posAnterior, [lat, lng]);
+        if (d < 500) distanciaRecorrida += d; // filtrar saltos grandes
+      }
+      posAnterior = [lat, lng];
+
+      actualizarStats(vel);
+      comprobarProximidad([lat, lng]);
+      actualizarInstruccion([lat, lng]);
+    },
+    err => {
+      statusEl.textContent = '✗ Sin señal GPS';
+      statusEl.className = 'error';
+    },
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+  );
+}
+
+// ── INSTRUCCIÓN SIGUIENTE ──────────────────────────────────────────────
+function actualizarInstruccion(pos) {
+  // Encontrar el punto de señalización más próximo hacia adelante
+  let masProximo = null;
+  let minDist = Infinity;
+
+  puntosPorProximidad.forEach(p => {
+    const d = distancia(pos, p.latlng);
+    if (d < minDist && d > 10) { // mayor de 10m (evitar "ya pasado")
+      minDist = d;
+      masProximo = p;
+    }
+  });
+
+  if (!masProximo) return;
+
+  const info = masProximo;
+  document.getElementById('inst-icono').textContent = info.icono;
+  document.getElementById('inst-distancia').textContent = minDist < 1000
+    ? `en ${Math.round(minDist)} m`
+    : `en ${(minDist/1000).toFixed(1)} km`;
+  document.getElementById('inst-nombre').textContent = info.titulo;
+  document.getElementById('inst-sub').textContent = info.desc;
+
+  // Colorear banner según tipo
+  const banner = document.getElementById('instruccion-banner');
+  if (info.tipo === 'atencion' || info.desc.toLowerCase().includes('peligro')) {
+    banner.style.background = '#7a3c00';
+  } else if (info.desc.toLowerCase().includes('izquierda') || info.desc.toLowerCase().includes('derecha')) {
+    banner.style.background = '#1e4d8c';
+  } else {
+    banner.style.background = '#1a3a1a';
+  }
+
+  // Actualizar stat "próx. señal"
+  document.getElementById('stat-next').textContent = minDist < 1000
+    ? Math.round(minDist) + 'm'
+    : (minDist/1000).toFixed(1) + 'k';
+}
+
+// ── PROXIMIDAD / ALERTAS ───────────────────────────────────────────────
+const RADIO_ALERTA = 40; // metros
+
+function comprobarProximidad(pos) {
+  puntosPorProximidad.forEach(p => {
+    const d = distancia(pos, p.latlng);
+    if (d < RADIO_ALERTA && !alertasYaMostradas.has(p.id)) {
+      alertasYaMostradas.add(p.id);
+      mostrarAlerta(p);
+      // Vibración si está disponible
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
+  });
+}
+
+function mostrarAlerta(p) {
+  document.getElementById('alerta-icono').textContent = p.icono;
+  document.getElementById('alerta-titulo').textContent = p.titulo;
+  document.getElementById('alerta-desc').textContent = p.desc;
+
+  const overlay = document.getElementById('alerta-overlay');
+  overlay.style.background = p.tipo === 'atencion' ? '#7a0000' : '#7a3c00';
+  overlay.classList.add('visible');
+
+  setTimeout(() => overlay.classList.remove('visible'), 4000);
+}
+
+// ── ESTADÍSTICAS ──────────────────────────────────────────────────────
+function actualizarStats(vel) {
+  const distKm = distanciaRecorrida / 1000;
+  const totalKm = (rutaActiva.properties.long_e || 20);
+  const restKm = Math.max(0, totalKm - distKm);
+
+  document.getElementById('stat-dist').textContent = distKm.toFixed(1);
+  document.getElementById('stat-rest').textContent = restKm.toFixed(1);
+  document.getElementById('stat-vel').textContent = vel !== null ? vel : '—';
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────
+function distancia([lat1, lon1], [lat2, lon2]) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function centrarMapa() {
+  if (posActual && map) {
+    autoCentrar = true;
+    map.setView(posActual, 15, { animate: true });
+  } else if (map && rutaLayer) {
+    map.fitBounds(rutaLayer.getBounds(), { padding: [20, 20] });
+  }
+}
+
+// Desactivar auto-centrar cuando el usuario mueve el mapa
+document.addEventListener('DOMContentLoaded', () => {
+  // Se añade el listener después de que map esté disponible (en initMapa)
+});
+
+function volverInicio() {
+  if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  if (map) { map.remove(); map = null; }
+  document.getElementById('screen-nav').style.display = 'none';
+  document.getElementById('screen-inicio').style.display = 'flex';
+  document.getElementById('btn-centrar').style.display = 'none';
+  document.getElementById('gps-status').style.display = 'none';
+}
+
+async function solicitarWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) {}
+}
+
+// ── INICIO ────────────────────────────────────────────────────────────
+cargarDatos();
+
+// Re-solicitar wakeLock si el usuario vuelve a la app
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && wakeLock === null) {
+    await solicitarWakeLock();
+  }
+});
+</script>
+
+<!-- Service Worker registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
